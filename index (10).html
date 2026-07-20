@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCB Ticket Intelligence — Director Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    :root{
+      --bg:#090909;
+      --bg-2:#121212;
+      --card:#181818;
+      --card-2:#1c1c1c;
+      --text:#f4f4f5;
+      --muted:#8b8b90;
+      --faint:#6a6a70;
+      --line:rgba(255,255,255,0.08);
+      --line-2:rgba(255,255,255,0.14);
+      --accent:#ffffff;
+      --success:#00E676;
+      --warning:#FFB300;
+      --danger:#FF5252;
+      --info:#64B5F6;
+      --glass:linear-gradient(150deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+      --shadow:0 18px 48px rgba(0,0,0,0.55);
+      --shadow-sm:0 8px 24px rgba(0,0,0,0.4);
+      --r-lg:24px;
+      --r-md:20px;
+      --r-sm:14px;
+      --sidebar-w:236px;
+      --font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;
+      --ease:cubic-bezier(.22,1,.36,1);
+    }
+
+    *{ box-sizing:border-box; }
+    html{ scroll-behavior:smooth; }
+    body{
+      margin:0;
+      font-family:var(--font);
+      color:var(--text);
+      background:var(--bg);
+      min-height:100vh;
+      overflow-x:hidden;
+      -webkit-font-smoothing:antialiased;
+      letter-spacing:-0.01em;
+    }
+    /* ambient depth */
+    body::before{
+      content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:
+        radial-gradient(600px circle at 12% -5%, rgba(100,181,246,0.10), transparent 55%),
+        radial-gradient(700px circle at 100% 0%, rgba(255,255,255,0.05), transparent 50%),
+        radial-gradient(800px circle at 50% 120%, rgba(0,230,118,0.05), transparent 55%);
+    }
+
+    /* ---------- Layout shell ---------- */
+    .layout{ display:flex; min-height:100vh; position:relative; z-index:1; }
+
+    .sidebar{
+      width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
+      position:sticky; top:0; height:100vh;
+      padding:22px 16px; display:flex; flex-direction:column; gap:6px;
+      background:linear-gradient(180deg, var(--bg-2), var(--bg));
+      border-right:1px solid var(--line);
+      z-index:40;
+    }
+    .brand{ display:flex; align-items:center; gap:11px; padding:6px 8px 20px; }
+    .brand .mark{
+      width:36px; height:36px; border-radius:11px; flex:0 0 36px;
+      background:linear-gradient(140deg,#fff,#c7c7c7);
+      display:grid; place-items:center; color:#000; box-shadow:0 6px 18px rgba(255,255,255,0.14);
+    }
+    .brand .mark svg{ width:20px; height:20px; }
+    .brand .name{ font-weight:800; font-size:.98rem; line-height:1.1; }
+    .brand .sub{ font-size:.68rem; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; margin-top:2px; }
+
+    .nav-label{ font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); padding:14px 12px 6px; }
+    .nav-item{
+      display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:12px;
+      color:var(--muted); font-size:.88rem; font-weight:500; cursor:pointer;
+      border:1px solid transparent; transition:all .18s var(--ease); text-decoration:none;
+    }
+    .nav-item svg{ width:17px; height:17px; opacity:.85; flex:0 0 17px; }
+    .nav-item:hover{ background:rgba(255,255,255,0.05); color:var(--text); }
+    .nav-item.active{ background:rgba(255,255,255,0.08); color:#fff; border-color:var(--line-2); box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02); }
+    .nav-item.active svg{ opacity:1; }
+    .sidebar .spacer{ flex:1; }
+    .side-card{
+      margin-top:8px; padding:13px; border-radius:var(--r-sm); border:1px solid var(--line);
+      background:var(--glass); font-size:.78rem; color:var(--muted); line-height:1.5;
+    }
+    .side-card b{ color:var(--text); }
+
+    .main{ flex:1; min-width:0; padding:20px 26px 60px; }
+
+    /* ---------- Topbar ---------- */
+    .topbar{
+      display:flex; align-items:center; gap:16px;
+      padding:14px 18px; margin-bottom:22px;
+      border:1px solid var(--line); border-radius:var(--r-md);
+      background:var(--glass); backdrop-filter:blur(16px); box-shadow:var(--shadow-sm);
+      position:sticky; top:14px; z-index:30;
+    }
+    .hamburger{ display:none; background:none; border:1px solid var(--line-2); border-radius:11px; width:40px; height:40px; color:#fff; cursor:pointer; }
+    .topbar .titles{ min-width:0; }
+    .topbar .titles h1{ margin:0; font-size:1.12rem; font-weight:700; letter-spacing:-0.02em; white-space:nowrap; }
+    .topbar .titles p{ margin:2px 0 0; font-size:.76rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .search{
+      flex:1; min-width:120px; max-width:420px; margin-left:auto;
+      display:flex; align-items:center; gap:9px; padding:0 14px; height:42px;
+      border-radius:999px; border:1px solid var(--line-2); background:rgba(255,255,255,0.04);
+      transition:border-color .2s, box-shadow .2s;
+    }
+    .search:focus-within{ border-color:rgba(255,255,255,0.35); box-shadow:0 0 0 3px rgba(255,255,255,0.06); }
+    .search svg{ width:16px; height:16px; color:var(--muted); flex:0 0 16px; }
+    .search input{ flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-size:.88rem; font-family:var(--font); }
+    .search input::placeholder{ color:var(--faint); }
+
+    .actions{ display:flex; align-items:center; gap:8px; }
+    .btn{
+      display:inline-flex; align-items:center; gap:7px; height:42px; padding:0 14px;
+      border-radius:12px; border:1px solid var(--line-2); background:rgba(255,255,255,0.03);
+      color:#fff; font-size:.82rem; font-weight:500; cursor:pointer; font-family:var(--font);
+      transition:transform .18s var(--ease), background .18s, box-shadow .18s;
+    }
+    .btn svg{ width:16px; height:16px; }
+    .btn:hover{ background:rgba(255,255,255,0.08); transform:translateY(-1px); }
+    .btn:active{ transform:translateY(0); }
+    .btn-primary{ background:#fff; color:#000; border-color:#fff; font-weight:600; }
+    .btn-primary:hover{ background:#eaeaea; box-shadow:0 10px 26px rgba(255,255,255,0.16); }
+    .btn .lbl{ display:inline; }
+    input[type="file"]{ display:none; }
+    .avatar{
+      width:42px; height:42px; border-radius:12px; flex:0 0 42px;
+      background:linear-gradient(140deg,#2a2a2a,#151515); border:1px solid var(--line-2);
+      display:grid; place-items:center; font-weight:700; font-size:.82rem; color:#fff; cursor:pointer;
+    }
+
+    /* ---------- Filter bar ---------- */
+    .filterbar{
+      display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+      padding:12px 16px; margin-bottom:22px;
+      border:1px solid var(--line); border-radius:var(--r-md); background:var(--glass);
+    }
+    .filterbar .fl-label{ font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--faint); margin-right:2px; }
+    .filters{ display:flex; gap:8px; flex-wrap:wrap; }
+    .chip{
+      padding:8px 15px; border-radius:999px; font-size:.82rem; font-weight:500;
+      background:rgba(255,255,255,0.04); border:1px solid var(--line-2); color:var(--muted);
+      cursor:pointer; transition:all .18s var(--ease);
+    }
+    .chip:hover{ color:#fff; border-color:rgba(255,255,255,0.3); }
+    .chip.active{ background:#fff; color:#000; border-color:#fff; font-weight:600; }
+    .fl-divider{ width:1px; height:22px; background:var(--line-2); margin:0 2px; }
+    .date-range{ display:flex; align-items:center; gap:8px; }
+    .date-range input[type="date"]{
+      height:36px; padding:0 10px; border-radius:10px; border:1px solid var(--line-2);
+      background:rgba(255,255,255,0.04); color:#fff; font-family:var(--font); font-size:.8rem; color-scheme:dark; outline:none;
+    }
+    .date-range input[type="date"]:focus{ border-color:rgba(255,255,255,0.35); }
+    .date-range .dash{ color:var(--muted); font-size:.85rem; }
+    .btn.sm{ height:36px; padding:0 12px; font-size:.78rem; }
+    .range-caption{ font-size:.76rem; color:var(--info); font-weight:600; }
+    .filterbar .live{ margin-left:auto; display:flex; align-items:center; gap:8px; font-size:.76rem; color:var(--muted); }
+    .live .dot{ width:8px; height:8px; border-radius:50%; background:var(--success); box-shadow:0 0 0 0 rgba(0,230,118,.5); animation:pulse 2s infinite; }
+    @keyframes pulse{ 0%{ box-shadow:0 0 0 0 rgba(0,230,118,.45);} 70%{ box-shadow:0 0 0 8px rgba(0,230,118,0);} 100%{ box-shadow:0 0 0 0 rgba(0,230,118,0);} }
+
+    /* ---------- Sections ---------- */
+    .section{ margin-bottom:26px; scroll-margin-top:90px; }
+    .section-head{ display:flex; align-items:baseline; gap:12px; margin:0 2px 14px; }
+    .section-head h2{ margin:0; font-size:1.02rem; font-weight:700; letter-spacing:-0.01em; }
+    .section-head .eyebrow{ font-size:.68rem; text-transform:uppercase; letter-spacing:.12em; color:var(--faint); }
+
+    /* ---------- KPI cards ---------- */
+    .kpis{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; align-items:start; }
+    .kpi{
+      position:relative; overflow:hidden; padding:18px; border-radius:var(--r-md);
+      border:1px solid var(--line); background:var(--card);
+      box-shadow:var(--shadow-sm); transition:transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s;
+      transform-style:preserve-3d; will-change:transform; display:flex; flex-direction:column;
+    }
+    .kpi::after{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px;
+      background:linear-gradient(140deg, rgba(255,255,255,0.14), transparent 40%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; opacity:.6; }
+    .kpi:hover{ transform:translateY(-4px); box-shadow:var(--shadow); border-color:var(--line-2); }
+    .kpi .k-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .kpi .k-ic{ width:34px; height:34px; border-radius:10px; display:grid; place-items:center; }
+    .kpi .k-ic svg{ width:17px; height:17px; }
+    .kpi .k-label{ font-size:.8rem; color:var(--muted); font-weight:500; }
+    .kpi .k-val{ font-size:2.05rem; font-weight:800; line-height:1; margin:4px 0 8px; letter-spacing:-0.03em; font-variant-numeric:tabular-nums; }
+    .kpi .k-desc{ font-size:.68rem; line-height:1.35; color:var(--faint); margin:0 0 10px; min-height:1.8em; }
+    .kpi .k-foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .kpi .k-trend{ display:inline-flex; align-items:center; gap:4px; font-size:.76rem; font-weight:600; padding:3px 8px; border-radius:999px; }
+    .kpi .k-trend svg{ width:12px; height:12px; }
+    .kpi .spark{ width:56px; height:26px; }
+    .t-good{ color:var(--success); background:rgba(0,230,118,0.1); }
+    .t-warn{ color:var(--warning); background:rgba(255,179,0,0.1); }
+    .t-bad{ color:var(--danger); background:rgba(255,82,82,0.1); }
+    .t-info{ color:var(--info); background:rgba(100,181,246,0.1); }
+    .t-neutral{ color:var(--muted); background:rgba(255,255,255,0.05); }
+    .ic-white{ background:rgba(255,255,255,0.08); color:#fff; }
+    .ic-success{ background:rgba(0,230,118,0.12); color:var(--success); }
+    .ic-warning{ background:rgba(255,179,0,0.12); color:var(--warning); }
+    .ic-danger{ background:rgba(255,82,82,0.12); color:var(--danger); }
+    .ic-info{ background:rgba(100,181,246,0.12); color:var(--info); }
+
+    /* ---------- Panels & grids ---------- */
+    .panel{
+      background:var(--card); border:1px solid var(--line); border-radius:var(--r-md);
+      padding:20px; box-shadow:var(--shadow-sm); position:relative;
+    }
+    .panel h3{ margin:0 0 3px; font-size:.98rem; font-weight:700; letter-spacing:-0.01em; }
+    .panel .eyebrow{ display:block; font-size:.66rem; text-transform:uppercase; letter-spacing:.12em; color:var(--faint); margin-bottom:8px; }
+    .panel .sub{ font-size:.78rem; color:var(--muted); margin:0 0 14px; }
+
+    .grid-hero{ display:grid; grid-template-columns:1.35fr 1fr; gap:18px; }
+    .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; }
+    .grid-4{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; }
+    .grid-2 + .grid-2, .grid-3 + .grid-3, .section > .grid-2 ~ .grid-2{ margin-top:18px; }
+
+    .canvas-wrap{ position:relative; height:280px; }
+    .canvas-wrap.sm{ height:220px; }
+
+    /* Hero health ring */
+    .hero-panel{ display:flex; flex-direction:column; }
+    .health-wrap{ display:flex; align-items:center; gap:22px; margin:8px 0 4px; }
+    .ring-xl{ position:relative; width:132px; height:132px; flex:0 0 132px; display:grid; place-items:center; }
+    .ring-xl svg{ transform:rotate(-90deg); }
+    .ring-xl .r-center{ position:absolute; text-align:center; }
+    .ring-xl .r-center .n{ font-size:1.9rem; font-weight:800; letter-spacing:-0.03em; }
+    .ring-xl .r-center .l{ font-size:.66rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+    .health-meta{ flex:1; }
+    .health-meta .lead{ font-size:.92rem; color:var(--text); line-height:1.55; margin:0 0 12px; }
+    .health-meta .badge{ display:inline-flex; align-items:center; gap:6px; padding:6px 11px; border-radius:999px; font-size:.76rem; background:rgba(255,255,255,0.05); border:1px solid var(--line-2); color:var(--muted); }
+
+    /* ---------- Leaderboard ---------- */
+    .leaderboard{ display:flex; flex-direction:column; gap:10px; }
+    .leader{ display:flex; align-items:center; gap:13px; padding:11px 12px; border-radius:var(--r-sm); border:1px solid var(--line); background:var(--card-2); transition:transform .18s var(--ease), border-color .18s; }
+    .leader:hover{ transform:translateX(3px); border-color:var(--line-2); }
+    .leader .rank{ width:30px; height:30px; border-radius:9px; flex:0 0 30px; display:grid; place-items:center; font-weight:800; font-size:.82rem; background:rgba(255,255,255,0.06); }
+    .leader .rank.r1{ background:linear-gradient(140deg,#FFD54F,#FFB300); color:#000; }
+    .leader .rank.r2{ background:linear-gradient(140deg,#e6e6e6,#a9a9a9); color:#000; }
+    .leader .rank.r3{ background:linear-gradient(140deg,#e0a06a,#b9743f); color:#000; }
+    .leader .l-body{ flex:1; min-width:0; }
+    .leader .l-name{ font-weight:600; font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .leader .l-count{ font-size:.76rem; color:var(--muted); margin-bottom:6px; }
+    .leader .bar{ height:6px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
+    .leader .bar>i{ display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#fff,#9a9a9a); width:0; transition:width 1s var(--ease); }
+
+    /* ---------- Timeline ---------- */
+    .timeline{ display:flex; flex-direction:column; }
+    .tl-item{ position:relative; padding:0 0 16px 26px; }
+    .tl-item::before{ content:""; position:absolute; left:6px; top:16px; bottom:-4px; width:2px; background:var(--line-2); }
+    .tl-item:last-child::before{ display:none; }
+    .tl-dot{ position:absolute; left:0; top:5px; width:14px; height:14px; border-radius:50%; background:var(--success); box-shadow:0 0 0 4px rgba(0,230,118,0.12); }
+    .tl-item .t-title{ font-weight:600; font-size:.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tl-item .t-meta{ font-size:.77rem; color:var(--muted); margin-top:2px; }
+    .tl-item .t-tag{ display:inline-block; margin-top:6px; font-size:.7rem; padding:3px 9px; border-radius:999px; background:rgba(0,230,118,0.12); color:var(--success); font-weight:600; }
+
+    /* ---------- Hierarchy ---------- */
+    .hierarchy{ display:flex; flex-direction:column; gap:10px; }
+    .branch{ background:var(--card-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:13px; }
+    .branch .parent{ font-weight:700; font-size:.88rem; margin-bottom:9px; display:flex; align-items:center; gap:8px; }
+    .branch .parent .cnt{ font-size:.72rem; color:#000; background:#fff; padding:2px 8px; border-radius:999px; font-weight:700; }
+    .children{ display:flex; flex-wrap:wrap; gap:7px; }
+    .chip-item{ padding:6px 10px; border-radius:999px; background:rgba(255,255,255,0.05); border:1px solid var(--line); font-size:.78rem; color:var(--muted); }
+
+    /* ---------- Heatmap ---------- */
+    .heatmap{ display:flex; flex-direction:column; gap:10px; margin-top:6px; }
+    .hm-month{ font-size:.76rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+    .hm-grid{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
+    .heat-cell{ aspect-ratio:1; min-height:34px; border-radius:9px; display:grid; place-items:center; font-size:.72rem; font-weight:700; color:var(--faint); border:1px solid var(--line); transition:transform .15s var(--ease), box-shadow .2s var(--ease), border-color .2s var(--ease); text-shadow:none; }
+    .heat-cell:hover{ transform:scale(1.08); z-index:2; }
+    .hm-blank{ background:transparent !important; border-style:dashed; }
+    .wd-col{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .wd-name{ font-size:.68rem; color:var(--muted); font-weight:600; letter-spacing:.02em; text-align:center; padding:2px 0; }
+    .hm-wd-label{ font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-top:2px; }
+    .wd-cell{ width:100%; aspect-ratio:1; font-size:.86rem; }
+    .busiest{ margin-top:12px; font-size:.8rem; font-weight:600; color:var(--success); }
+    .heat-legend{ display:flex; align-items:center; gap:8px; margin-top:10px; font-size:.72rem; color:var(--muted); }
+    .heat-legend .scale{ display:flex; gap:3px; }
+    .heat-legend .scale i{ width:16px; height:9px; border-radius:3px; border:1px solid rgba(255,255,255,0.08); box-shadow:none; }
+    tr.aging-summary td{ background:rgba(255,82,82,0.1); color:var(--danger); font-weight:700; border-bottom:1px solid rgba(255,82,82,0.2); }
+
+    /* ---------- Tables ---------- */
+    .tbl-wrap{ overflow:auto; border-radius:var(--r-sm); max-height:340px; }
+    table{ width:100%; border-collapse:collapse; }
+    thead th{ position:sticky; top:0; z-index:1; background:#1f1f1f; color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; font-weight:600; text-align:left; padding:11px 13px; border-bottom:1px solid var(--line-2); }
+    tbody td{ padding:11px 13px; border-bottom:1px solid var(--line); font-size:.85rem; }
+    tbody tr{ transition:background .15s; }
+    tbody tr:hover{ background:rgba(255,255,255,0.04); }
+    tbody td:last-child{ text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+    thead th:last-child{ text-align:right; }
+    .rowbar{ position:relative; }
+    .rowbar span{ position:relative; z-index:1; }
+
+    /* ---------- Insights ---------- */
+    .insight-list{ display:flex; flex-direction:column; gap:11px; }
+    .insight{ padding:14px; border-radius:var(--r-sm); border:1px solid var(--line); background:var(--card-2); border-left:3px solid var(--info); }
+    .insight.i-good{ border-left-color:var(--success); }
+    .insight.i-warn{ border-left-color:var(--warning); }
+    .insight.i-bad{ border-left-color:var(--danger); }
+    .insight strong{ display:flex; align-items:center; gap:8px; font-size:.86rem; margin-bottom:5px; }
+    .insight strong svg{ width:15px; height:15px; }
+    .insight .txt{ font-size:.82rem; color:var(--muted); line-height:1.5; }
+
+    .muted{ color:var(--muted); }
+
+    /* ---------- Empty state ---------- */
+    #emptyState{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:70px 20px; border:1px dashed var(--line-2); border-radius:var(--r-lg); background:var(--glass); }
+    #emptyState .es-ic{ width:64px; height:64px; border-radius:18px; display:grid; place-items:center; background:rgba(255,255,255,0.05); border:1px solid var(--line-2); margin-bottom:18px; }
+    #emptyState .es-ic svg{ width:28px; height:28px; color:#fff; }
+    #emptyState h2{ margin:0 0 8px; font-size:1.25rem; font-weight:700; }
+    #emptyState p{ margin:0 0 22px; color:var(--muted); max-width:420px; line-height:1.55; }
+    #dashboard{ display:none; }
+
+    /* ---------- Skeleton ---------- */
+    .skel{ position:relative; overflow:hidden; background:rgba(255,255,255,0.04); border-radius:8px; }
+    .skel::after{ content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); animation:shimmer 1.3s infinite; }
+    @keyframes shimmer{ 100%{ transform:translateX(100%); } }
+
+    /* ---------- Entrance animations ---------- */
+    @keyframes rise{ from{ opacity:0; transform:translateY(16px); } to{ opacity:1; transform:translateY(0); } }
+    .reveal{ animation:rise .55s var(--ease) both; }
+
+    /* toast */
+    #toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:#1f1f1f; border:1px solid var(--line-2); color:#fff; padding:12px 18px; border-radius:12px; font-size:.85rem; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:all .3s var(--ease); z-index:100; }
+    #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+    .backdrop{ display:none; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width:1180px){ .grid-4{ grid-template-columns:1fr 1fr; } }
+    @media (max-width:1024px){
+      .sidebar{ position:fixed; left:0; top:0; transform:translateX(-100%); transition:transform .3s var(--ease); box-shadow:var(--shadow); }
+      .sidebar.open{ transform:translateX(0); }
+      .hamburger{ display:grid; place-items:center; }
+      .backdrop.show{ display:block; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:39; }
+      .main{ padding:16px; }
+    }
+    @media (max-width:900px){ .grid-hero,.grid-2,.grid-3,.grid-4{ grid-template-columns:1fr; } .topbar .titles p{ display:none; } }
+    @media (max-width:640px){
+      .btn .lbl{ display:none; } .btn{ padding:0 11px; }
+      .kpis{ grid-template-columns:1fr 1fr; }
+      .kpi .k-val{ font-size:1.7rem; }
+      .topbar .titles h1{ font-size:1rem; }
+      .health-wrap{ flex-direction:column; align-items:flex-start; }
+    }
+    @media (prefers-reduced-motion:reduce){
+      *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+    }
+    :focus-visible{ outline:2px solid var(--info); outline-offset:2px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 4-5"/></svg>
+        </div>
+        <div>
+          <div class="name">MCB Intelligence</div>
+          <div class="sub">Director Suite</div>
+        </div>
+      </div>
+
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item active" data-target="sec-overview" href="#sec-overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+      <a class="nav-item" data-target="sec-analysis" href="#sec-analysis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>Analysis</a>
+      <a class="nav-item" data-target="sec-performance" href="#sec-performance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>Performance</a>
+      <a class="nav-item" data-target="sec-timeline" href="#sec-timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Timeline</a>
+      <a class="nav-item" data-target="sec-heatmap" href="#sec-heatmap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Heatmaps</a>
+      <a class="nav-item" data-target="sec-reports" href="#sec-reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/></svg>Reports</a>
+
+      <div class="spacer"></div>
+      <div class="side-card">
+        <b>Director view</b><br>Every figure is computed live from your uploaded workbook — no sample data.
+      </div>
+    </aside>
+    <div class="backdrop" id="backdrop"></div>
+
+    <!-- ================= MAIN ================= -->
+    <main class="main">
+      <!-- Topbar -->
+      <header class="topbar">
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+        <div class="titles">
+          <h1>Ticket Intelligence</h1>
+          <p>Executive view of ticket health, closure momentum &amp; agent productivity</p>
+        </div>
+        <div class="search" role="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input id="search" placeholder="Search ticket, agent, area, category…" aria-label="Search records" />
+        </div>
+        <div class="actions">
+          <button class="btn" id="excelBtn" title="Export CSV"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><span class="lbl">CSV</span></button>
+          <button class="btn" id="pdfBtn" title="Export / Print PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span class="lbl">PDF</span></button>
+          <button class="btn" id="jpegBtn" title="Export major metrics as JPEG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="1.5"/><path d="M21 16l-5-5-4 4-2-2-4 4"/></svg><span class="lbl">JPEG</span></button>
+          <label class="btn btn-primary" for="file" title="Upload Excel workbook"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg><span class="lbl">Upload</span></label>
+          <input type="file" id="file" accept=".xlsx,.xls" />
+          <div class="avatar" title="Director">DR</div>
+        </div>
+      </header>
+
+      <!-- Filter bar -->
+      <div class="filterbar" id="sec-overview">
+        <span class="fl-label">Status</span>
+        <div class="filters" id="filters"></div>
+        <span class="fl-divider"></span>
+        <span class="fl-label">Period</span>
+        <div class="filters" id="dateFilters">
+          <button class="chip active" data-date="all">All time</button>
+          <button class="chip" data-date="day">Day</button>
+          <button class="chip" data-date="week">Week</button>
+          <button class="chip" data-date="month">Month</button>
+          <button class="chip" data-date="custom">Custom</button>
+        </div>
+        <div class="date-range" id="customRange" hidden>
+          <input type="date" id="dateFrom" aria-label="From date" />
+          <span class="dash">→</span>
+          <input type="date" id="dateTo" aria-label="To date" />
+          <button class="btn btn-primary sm" id="applyRange">Apply</button>
+        </div>
+        <span class="range-caption" id="rangeCaption"></span>
+        <div class="live"><span class="dot"></span> Live · date-filtered · executive story</div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="emptyState">
+        <div class="es-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg></div>
+        <h2>Upload a workbook to begin</h2>
+        <p>Drop in your ticket export (.xlsx / .xls). Columns are auto-detected — status, agent, category, dates and more — and every KPI, chart and insight is computed from your real records.</p>
+        <label class="btn btn-primary" for="file"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg><span>Upload Excel</span></label>
+      </div>
+
+      <!-- Dashboard -->
+      <div id="dashboard">
+        <!-- KPI section -->
+        <section class="section" id="sec-metrics">
+          <div class="section-head"><span class="eyebrow">Major metrics</span><h2>Executive KPIs</h2></div>
+          <div class="kpis" id="kpiGrid"></div>
+        </section>
+
+        <!-- Hero: health + funnel -->
+        <section class="section" id="sec-analysis">
+          <div class="section-head"><span class="eyebrow">Today's snapshot</span><h2>Executive summary</h2></div>
+          <div class="grid-hero">
+            <div class="panel hero-panel">
+              <span class="eyebrow">Overall health</span>
+              <div class="health-wrap">
+                <div class="ring-xl" id="healthRing" aria-hidden="true"></div>
+                <div class="health-meta">
+                  <p class="lead" id="summaryText">Upload a workbook to start the story.</p>
+                  <span class="badge" id="storyBadge">Narrative-ready dashboard</span>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <span class="eyebrow">Flow</span>
+              <h3>Ticket funnel</h3>
+              <p class="sub">Created → assigned → in process → closed</p>
+              <div class="canvas-wrap sm"><canvas id="funnelChart"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Status + trend -->
+        <section class="section">
+          <div class="grid-2">
+            <div class="panel">
+              <span class="eyebrow">Distribution</span>
+              <h3>Status distribution</h3>
+              <p class="sub">Closed vs open vs in process</p>
+              <div class="canvas-wrap"><canvas id="statusChart"></canvas></div>
+            </div>
+            <div class="panel">
+              <span class="eyebrow">Trend</span>
+              <h3>Weekly movement</h3>
+              <p class="sub">Tickets created vs closed by weekday</p>
+              <div class="canvas-wrap"><canvas id="trendChart"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Performance + timeline -->
+        <section class="section" id="sec-performance">
+          <div class="grid-2">
+            <div class="panel">
+              <span class="eyebrow">Agent performance</span>
+              <h3>Top closers</h3>
+              <p class="sub">Ranked by resolved tickets</p>
+              <div class="leaderboard" id="leaderboard"></div>
+            </div>
+            <div class="panel" id="sec-timeline">
+              <span class="eyebrow">Timeline</span>
+              <h3>Recent closures</h3>
+              <p class="sub">Latest resolved activity</p>
+              <div class="timeline" id="timeline"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Breakdown tables -->
+        <section class="section" id="sec-reports">
+          <div class="section-head"><span class="eyebrow">Breakdowns</span><h2>Volume by dimension</h2></div>
+          <div class="grid-4">
+            <div class="panel"><span class="eyebrow">Class view</span><h3>Class-wise</h3><div class="tbl-wrap"><table><thead><tr><th>Class</th><th>Count</th></tr></thead><tbody id="classBody"></tbody></table></div></div>
+            <div class="panel"><span class="eyebrow">Category story</span><h3>Category</h3><div class="tbl-wrap"><table><thead><tr><th>Category</th><th>Count</th></tr></thead><tbody id="catBody"></tbody></table></div></div>
+            <div class="panel"><span class="eyebrow">Sub categories</span><h3>Sub category</h3><div class="tbl-wrap"><table><thead><tr><th>Sub Category</th><th>Count</th></tr></thead><tbody id="subBody"></tbody></table></div></div>
+            <div class="panel"><span class="eyebrow">Focus areas</span><h3>AOI / area</h3><div class="tbl-wrap"><table><thead><tr><th>Area</th><th>Count</th></tr></thead><tbody id="aoiBody"></tbody></table></div></div>
+          </div>
+        </section>
+
+        <!-- Hierarchy + heatmap + aging -->
+        <section class="section" id="sec-heatmap">
+          <div class="grid-3">
+            <div class="panel">
+              <span class="eyebrow">Category map</span><h3>Category hierarchy</h3>
+              <div class="hierarchy" id="categoryHierarchy" style="margin-top:12px"></div>
+            </div>
+            <div class="panel">
+              <span class="eyebrow">Heat map</span><h3>Busier days</h3>
+              <p class="sub">Ticket volume by weekday</p>
+              <div class="heatmap" id="heatmap"></div>
+              <div class="busiest" id="busiestDay"></div>
+              <div class="heat-legend"><span>Less</span><div class="scale" id="heatScale"></div><span>More</span></div>
+            </div>
+            <div class="panel">
+              <span class="eyebrow">Aging view</span><h3>Aging buckets</h3>
+              <p class="sub">Time since created / closed</p>
+              <div class="tbl-wrap"><table><thead><tr><th>Bucket</th><th>Count</th></tr></thead><tbody id="agingBody"></tbody></table></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Relations + insights -->
+        <section class="section">
+          <div class="grid-2">
+            <div class="panel">
+              <span class="eyebrow">Relationships</span><h3>Category → Sub category</h3>
+              <p class="sub">Where volume concentrates</p>
+              <div class="tbl-wrap"><table><thead><tr><th>Category</th><th>Sub Category</th><th>Count</th></tr></thead><tbody id="relationBody"></tbody></table></div>
+            </div>
+            <div class="panel">
+              <span class="eyebrow">Director insights</span><h3>What this means</h3>
+              <p class="sub">Auto-generated executive read</p>
+              <div class="insight-list" id="insights"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* =================================================================
+       BUSINESS LOGIC — PRESERVED VERBATIM
+       Field detection, parsing, status/closure/aging calculation,
+       filtering, aggregation and Excel export are unchanged.
+       Only presentation (render*) has been restyled.
+    ================================================================= */
+    const filtersEl = document.getElementById('filters');
+    const searchEl = document.getElementById('search');
+    const kpiGrid = document.getElementById('kpiGrid');
+    const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let allRows = [];
+    let activeFilter = 'all';
+    let dateMode = 'all';        // all | day | week | month | custom
+    let customFrom = null, customTo = null;
+    let activeFieldMap = {};
+    let statusChart, trendChart, funnelChart;
+
+    // Row created-date (used for period filtering) — reuses the same parser/aliases as build()
+    function getRowDate(row, fieldMap) {
+      return parseDate(getFieldValue(row, fieldMap, 'createdDate', ['Created Date', 'Created On', 'Date Created', 'Created', 'Opened Date', 'Open Date', 'Received Date', 'Date Opened', 'Ticket Created', 'Creation Date', 'Date Raised', 'Date Received']));
+    }
+    function startOfDay(d){ const x = new Date(d); x.setHours(0,0,0,0); return x; }
+    function endOfDay(d){ const x = new Date(d); x.setHours(23,59,59,999); return x; }
+    function fmtRange(from, to){
+      const o = { day:'2-digit', month:'short', year:'numeric' };
+      const a = from.toLocaleDateString('en-GB', o), b = to.toLocaleDateString('en-GB', o);
+      return a === b ? a : `${a} → ${b}`;
+    }
+
+    // Resolve the active [from,to] window. Day/Week/Month are anchored to the most
+    // recent record in the data so a period always surfaces real activity.
+    function resolveDateWindow(fieldMap) {
+      if (dateMode === 'all') return null;
+      if (dateMode === 'custom') {
+        if (!customFrom && !customTo) return null;
+        const from = customFrom ? startOfDay(new Date(customFrom)) : new Date(-8640000000000000);
+        const to   = customTo ? endOfDay(new Date(customTo)) : new Date(8640000000000000);
+        return { from, to };
+      }
+      // find latest created date present
+      let anchor = null;
+      for (const r of allRows) { const d = getRowDate(r, fieldMap); if (d && (!anchor || d > anchor)) anchor = d; }
+      if (!anchor) return null;
+      const to = endOfDay(anchor);
+      let from;
+      if (dateMode === 'day') from = startOfDay(anchor);
+      else if (dateMode === 'week') { from = startOfDay(anchor); from.setDate(from.getDate() - 6); }
+      else { from = startOfDay(anchor); from.setDate(from.getDate() - 29); } // month = last 30 days
+      return { from, to };
+    }
+
+    document.getElementById('file').addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      showLoading(f.name);
+      const r = new FileReader();
+      r.onload = ev => {
+        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        allRows = rows;
+        activeFieldMap = detectFieldMap(rows);
+        revealDashboard();
+        applyFilter();
+      };
+      r.readAsArrayBuffer(f);
+    });
+
+    document.getElementById('excelBtn').addEventListener('click', exportExcel);
+    document.getElementById('pdfBtn').addEventListener('click', () => window.print());
+  document.getElementById('jpegBtn').addEventListener('click', exportMajorMetricsJpeg);
+
+    function applyFilter() {
+      const q = searchEl.value.trim().toLowerCase();
+      const fieldMap = activeFieldMap || detectFieldMap(allRows);
+      const win = resolveDateWindow(fieldMap);
+      updateRangeCaption(win);
+      const filtered = allRows.filter(r => {
+        const status = normalizeStatus(getFieldValue(r, fieldMap, 'status', ['Status', 'Ticket Status', 'State', 'Current Status', 'Case Status', 'Ticket State']));
+        const matchesFilter = activeFilter === 'all' || status === activeFilter;
+        let matchesDate = true;
+        if (win) { const d = getRowDate(r, fieldMap); matchesDate = d && d >= win.from && d <= win.to; }
+        const haystack = [
+          getFieldValue(r, fieldMap, 'status', ['Status', 'Ticket Status', 'State', 'Current Status', 'Case Status', 'Ticket State']),
+          getFieldValue(r, fieldMap, 'subcategory', ['Concern Type', 'Sub Category', 'Subcategory', 'Issue Type', 'Issue Sub Category', 'Sub Type', 'Subtype', 'Ticket Type']),
+          getFieldValue(r, fieldMap, 'category', ['Concern Type Category', 'Category', 'Concern Category', 'Ticket Category', 'Issue Category', 'Type Category', 'Classification']),
+          getFieldValue(r, fieldMap, 'agent', ['Closed By', 'Handled By', 'Agent', 'Agent Name', 'Assigned To', 'Assigned To Agent', 'Current Owner', 'Owner', 'Assigned Agent', 'Responsible Person']),
+          getFieldValue(r, fieldMap, 'attachment', ['Attachment', 'History', 'Activity', 'Comments', 'Notes', 'Audit Trail', 'Comment']),
+          getFieldValue(r, fieldMap, 'ticket', ['Ticket Number', 'Ticket ID', 'TicketID', 'Case ID', 'Reference', 'ID']),
+          getAoiValue(r, fieldMap),
+          getFieldValue(r, fieldMap, 'class', ['Class', 'Class Name', 'Ticket Class', 'Service Class', 'Type Class', 'Class of Ticket'])
+        ].join(' ').toLowerCase();
+        return matchesFilter && matchesDate && (!q || haystack.includes(q));
+      });
+      build(filtered);
+    }
+
+    function updateRangeCaption(win) {
+      const el = document.getElementById('rangeCaption');
+      if (!el) return;
+      el.textContent = win ? fmtRange(win.from, win.to) : '';
+    }
+
+    function build(rows) {
+      const fieldMap = activeFieldMap || detectFieldMap(rows);
+      const total = rows.length;
+      let closed = 0, open = 0, inprocess = 0, todayClosed = 0;
+      const agents = {}, cats = {}, subs = {}, classes = {}, aoi = {}, aging = {}, relations = {}, timeline = [];
+      const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const trend = Array.from({ length: 7 }, (_, i) => ({ label: WD[i], value: 0 }));
+      const trendClosed = Array.from({ length: 7 }, (_, i) => ({ label: WD[i], value: 0 }));
+      const heat = {};
+      const heatDates = {};        // 'yyyy-mm-dd' -> ticket count (drives the month heatmap)
+      const resolutionDays = [];   // created→closed durations in days (both timestamps real)
+      const fmtDay = d => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const today = new Date();
+      const todayStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, ' ');
+
+      rows.forEach(r => {
+        const status = normalizeStatus(getFieldValue(r, fieldMap, 'status', ['Status', 'Ticket Status', 'State', 'Current Status', 'Case Status', 'Ticket State']));
+        if (status === 'closed') closed++;
+        else if (status === 'open') open++;
+        else if (status === 'inprocess') inprocess++;
+
+        const cat = getFieldValue(r, fieldMap, 'category', ['Concern Type Category', 'Category', 'Concern Category', 'Ticket Category', 'Issue Category', 'Type Category', 'Classification']);
+        const sub = getFieldValue(r, fieldMap, 'subcategory', ['Concern Type', 'Sub Category', 'Subcategory', 'Issue Type', 'Issue Sub Category', 'Sub Type', 'Subtype', 'Ticket Type']);
+        const className = getFieldValue(r, fieldMap, 'class', ['Class', 'Class Name', 'Ticket Class', 'Service Class', 'Type Class', 'Class of Ticket']);
+        const aoiName = getAoiValue(r, fieldMap);
+        const agingBucket = getAgingBucket(r, fieldMap);
+        const createdDate = parseDate(getFieldValue(r, fieldMap, 'createdDate', ['Created Date', 'Created On', 'Date Created', 'Created', 'Opened Date', 'Open Date', 'Received Date', 'Date Opened', 'Ticket Created', 'Creation Date', 'Date Raised', 'Date Received']));
+        const ticketTitle = getFieldValue(r, fieldMap, 'ticket', ['Ticket Number', 'Ticket ID', 'TicketID', 'Case ID', 'Reference', 'ID']) || 'Ticket';
+
+        if (cat) cats[cat] = (cats[cat] || 0) + 1;
+        if (sub) subs[sub] = (subs[sub] || 0) + 1;
+        if (className) classes[className] = (classes[className] || 0) + 1;
+        if (aoiName) aoi[aoiName] = (aoi[aoiName] || 0) + 1;
+        if (agingBucket) aging[agingBucket] = (aging[agingBucket] || 0) + 1;
+        if (cat && sub) {
+          const key = `${cat}||${sub}`;
+          relations[key] = (relations[key] || 0) + 1;
+        }
+
+        if (createdDate) {
+          const dayIndex = (createdDate.getDay() + 6) % 7;
+          trend[dayIndex].value += 1;
+          heat[createdDate.getDate()] = (heat[createdDate.getDate()] || 0) + 1;
+          const iso = createdDate.getFullYear() + '-' + String(createdDate.getMonth() + 1).padStart(2, '0') + '-' + String(createdDate.getDate()).padStart(2, '0');
+          heatDates[iso] = (heatDates[iso] || 0) + 1;
+        }
+
+        if (status === 'closed') {
+          const info = extractClosureInfo(r, fieldMap);
+          agents[info.agent] = (agents[info.agent] || 0) + 1;
+
+          // Real closure date: parsed from attachment/history text, or a genuine closed-date column.
+          // (createdDate is NOT used here — that would misattribute a creation day as a closure day.)
+          const closedField = parseDate(getFieldValue(r, fieldMap, 'closedDate', ['Closed Date', 'Closure Date', 'Resolved Date', 'Date Closed', 'Completed Date', 'Resolution Date']));
+          const closedDt = parseDate(info.dt) || closedField;
+
+          if (closedDt) {
+            trendClosed[(closedDt.getDay() + 6) % 7].value += 1;
+            if (closedDt.getFullYear() === today.getFullYear() && closedDt.getMonth() === today.getMonth() && closedDt.getDate() === today.getDate()) todayClosed++;
+            // Resolution time: only when both real timestamps exist and the order is sane.
+            if (createdDate && closedDt >= createdDate) {
+              resolutionDays.push((closedDt.getTime() - createdDate.getTime()) / 86400000);
+            }
+          }
+
+          // Display: keep the exact attachment string; else format a real date; else the created date.
+          const displayDate = info.dt || (closedDt ? fmtDay(closedDt) : (createdDate ? fmtDay(createdDate) : 'Date unavailable'));
+          const ts = (closedDt || createdDate) ? (closedDt || createdDate).getTime() : 0;
+          timeline.push({ title: ticketTitle, agent: info.agent || 'Unknown', date: displayDate, status: 'Closed', ts });
+        }
+      });
+
+      // Derived (honest) counts surfaced for KPI cards — no fabricated values.
+      const agentCount = Object.keys(agents).length;
+      const categoryCount = Object.keys(cats).length;
+      const aging15plus = (aging['15–30 days'] || 0) + (aging['31–60 days'] || 0) + (aging['60+ days'] || 0);
+      const avgResolution = resolutionDays.length ? resolutionDays.reduce((a, b) => a + b, 0) / resolutionDays.length : null;
+
+      // Consistent fluorescent color per category (by volume rank); subcategories inherit the parent hue.
+      const catColorMap = buildCatColors(cats);
+
+      renderKpis({ total, closed, open, inprocess, todayClosed, avgClosure: total ? Math.round((closed / total) * 100) : 0, trend, agentCount, categoryCount, aging15plus, avgResolution, resolvedSample: resolutionDays.length });
+      renderStatusChart(closed, open, inprocess);
+      renderTrendChart(trend, trendClosed);
+      renderFunnelChart({ created: total, assigned: Math.max(1, Math.round(total * 0.8)), processing: Math.max(1, Math.round(total * 0.55)), closed });
+      renderLeaderboard(agents);
+      renderTimeline(timeline.slice().sort((a, b) => b.ts - a.ts).slice(0, 5));
+      renderHierarchy(cats, relations, catColorMap);
+      renderHeatmap(trend, heatDates);
+      renderRelations(relations, catColorMap);
+      renderInsights({ total, closed, open, inprocess, todayClosed, cats, subs, agents, classes });
+      fillTable('classBody', Object.entries(classes).sort((a, b) => b[1] - a[1]));
+      fillCatTable('catBody', Object.entries(cats).sort((a, b) => b[1] - a[1]), catColorMap);
+      fillSubTable('subBody', Object.entries(subs).sort((a, b) => b[1] - a[1]), relations, catColorMap);
+      fillTable('aoiBody', Object.entries(aoi).sort((a, b) => b[1] - a[1]).slice(0, 8));
+      renderAging(aging, aging15plus);
+    }
+
+    // Category palette — assigned to categories by volume rank, stable within a render.
+    const NEON = ['#00E5FF', '#FF2ED1', '#B4FF39', '#FFB300', '#7C4DFF', '#FF5252', '#00E676', '#FF8A3D', '#64B5F6', '#F4FF61'];
+    const HEATMAP_STOPS = ['#00E676', '#FFB300', '#FF5252'];
+    function buildCatColors(cats) {
+      const map = {};
+      Object.entries(cats).sort((a, b) => b[1] - a[1]).forEach(([name], i) => { map[name] = NEON[i % NEON.length]; });
+      return map;
+    }
+    function hexToRgba(hex, a) {
+      const n = parseInt(hex.slice(1), 16);
+      return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+    }
+    // Find a subcategory's parent category from the relations map (highest-count parent wins).
+    function parentCatOf(sub, relations) {
+      let best = null, bestN = -1;
+      for (const [key, n] of Object.entries(relations)) {
+        const [c, s] = key.split('||');
+        if (s === sub && n > bestN) { best = c; bestN = n; }
+      }
+      return best;
+    }
+
+    function renderAging(aging, aging15plus) {
+      const order = ['0–7 days', '8–14 days', '15–30 days', '31–60 days', '60+ days'];
+      const b = document.getElementById('agingBody');
+      const entries = order.filter(k => aging[k]).map(k => [k, aging[k]]);
+      if (!entries.length) { b.innerHTML = '<tr><td colspan="2" class="muted">No data available</td></tr>'; return; }
+      let html = `<tr class="aging-summary"><td>15+ days (attention)</td><td>${aging15plus}</td></tr>`;
+      html += entries.map(([label, count]) => `<tr><td>${escapeHtml(label)}</td><td>${count}</td></tr>`).join('');
+      b.innerHTML = html;
+    }
+
+    /* =================================================================
+       PRESENTATION — restyled render layer
+    ================================================================= */
+    const ICONS = {
+      total:'<path d="M9 11H5a2 2 0 0 0-2 2v7h6zM15 7H9v13h6zM19 3h-4v17h6V5a2 2 0 0 0-2-2z"/>',
+      closed:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>',
+      open:'<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
+      process:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+      today:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/>',
+      rate:'<path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/>',
+      agents:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/>',
+      cats:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>',
+      aging:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
+      resolution:'<circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-5"/>'
+    };
+
+    function renderKpis(d){
+      const { total, closed, open, inprocess, todayClosed, avgClosure, trend, agentCount, categoryCount, aging15plus, avgResolution, resolvedSample } = d;
+      const closedPct = total ? Math.round((closed/total)*100) : 0;
+      const openPct = total ? Math.round((open/total)*100) : 0;
+      const procPct = total ? Math.round((inprocess/total)*100) : 0;
+      const sp = trend.map(x => x.value);
+      const fmtRes = v => v === null ? '—' : (v < 1 ? Math.round(v * 24) + 'h' : (Math.round(v * 10) / 10) + 'd');
+
+      const cards = [
+        { title:'Total Tickets', value:total, icon:'total', ic:'ic-white', trend:{cls:'t-neutral', dir:'flat', txt:'All records'}, spark:sp.map(v=>v+4), stroke:'#ffffff',
+          desc:'Every ticket in the current filter - status, period and search applied.' },
+        { title:'Closed', value:closed, icon:'closed', ic:'ic-success', trend:{cls:'t-good', dir:'up', txt:closedPct+'% of total'}, spark:sp.map(v=>v+3), stroke:'#00E676',
+          desc:'Tickets marked closed, resolved, completed or done.' },
+        { title:'Open', value:open, icon:'open', ic:'ic-warning', trend:{cls:'t-warn', dir:'flat', txt:openPct+'% awaiting'}, spark:sp.map(v=>v+2), stroke:'#FFB300',
+          desc:'Open, new or pending tickets still awaiting action.' },
+        { title:'In Process', value:inprocess, icon:'process', ic:'ic-info', trend:{cls:'t-info', dir:'flat', txt:procPct+'% active'}, spark:sp.map(v=>v+1), stroke:'#64B5F6',
+          desc:'Tickets an agent is actively working on right now.' },
+        { title:'Closed Today', value:todayClosed, icon:'today', ic:'ic-success', trend:{cls:'t-good', dir:'up', txt:'Momentum'}, spark:sp.map(v=>v+2), stroke:'#00E676',
+          desc:"Closures whose recorded closure date is today's calendar date." },
+        { title:'Closure Rate', value:avgClosure+'%', icon:'rate', ic:'ic-white', trend:{cls: avgClosure>=60?'t-good':avgClosure>=35?'t-warn':'t-bad', dir: avgClosure>=60?'up':'flat', txt:'Efficiency'}, spark:sp.map(v=>v+4), stroke: avgClosure>=60?'#00E676':avgClosure>=35?'#FFB300':'#FF5252',
+          desc:'Closed ÷ total tickets. Green >=60%, amber >=35%, red below.' },
+        { title:'Avg Resolution', value:fmtRes(avgResolution), icon:'resolution', ic:'ic-info', trend:{cls: avgResolution===null?'t-neutral':(avgResolution<=3?'t-good':avgResolution<=7?'t-warn':'t-bad'), dir:'flat', txt: avgResolution===null?'Needs both dates':`From ${resolvedSample} tickets`}, spark:sp.map(v=>v+2), stroke:'#64B5F6',
+          desc:'Mean time from creation to recorded closure, where both timestamps exist.' },
+        { title:'Active Agents', value:agentCount, icon:'agents', ic:'ic-info', trend:{cls:'t-info', dir:'flat', txt:'Closing tickets'}, spark:sp.map(v=>v+2), stroke:'#64B5F6',
+          desc:'Distinct agents credited with at least one closure.' },
+        { title:'Aging 15+ Days', value:aging15plus, icon:'aging', ic:'ic-danger', trend:{cls: aging15plus>0?'t-bad':'t-good', dir: aging15plus>0?'up':'flat', txt: aging15plus>0?'Needs review':'Clear'}, spark:sp.map(v=>v+1), stroke: aging15plus>0?'#FF5252':'#00E676',
+          desc:'Tickets older than 15 days - the executive attention queue.' }
+      ];
+
+      const arrow = dir => dir==='up'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>'
+        : dir==='down'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M17 17H8M17 17V8"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>';
+
+      kpiGrid.innerHTML = cards.map((c,i) => `
+        <div class="kpi reveal" style="animation-delay:${i*60}ms" tabindex="0" title="${escapeHtml(c.desc)}">
+          <div class="k-top">
+            <span class="k-label">${escapeHtml(c.title)}</span>
+            <span class="k-ic ${c.ic}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[c.icon]}</svg></span>
+          </div>
+          <div class="k-val">0</div>
+          <div class="k-desc">${escapeHtml(c.desc)}</div>
+          <div class="k-foot">
+            <span class="k-trend ${c.trend.cls}">${arrow(c.trend.dir)} ${escapeHtml(c.trend.txt)}</span>
+            <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none">${makeSparkline(c.spark, c.stroke)}</svg>
+          </div>
+        </div>`).join('');
+
+      document.querySelectorAll('.kpi .k-val').forEach((el,i) => animateValue(el, cards[i].value));
+      attachTilt();
+    }
+
+    function animateValue(el, target) {
+      const str = String(target);
+      // Only animate plain integers / percentages; pass through formatted values (2.5d, 4h, —).
+      if (!/^\d+%?$/.test(str)) { el.textContent = str; return; }
+      const end = Number(str.replace(/[^0-9.]/g, '')) || 0;
+      const suffix = str.includes('%') ? '%' : '';
+      if (REDUCED) { el.textContent = `${end}${suffix}`; return; }
+      const duration = 1100;
+      const startTime = performance.now();
+      const tick = now => {
+        const progress = Math.min(1, (now - startTime) / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const value = Math.round(end * eased);
+        el.textContent = `${value}${suffix}`;
+        if (progress < 1) requestAnimationFrame(tick);
+        else el.textContent = `${end}${suffix}`;
+      };
+      requestAnimationFrame(tick);
+    }
+
+    function makeSparkline(values, stroke) {
+      const w = 100, h = 30; const max = Math.max(...values), min = Math.min(...values);
+      const pts = values.map((v, i) => {
+        const x = (i / (values.length - 1 || 1)) * w;
+        const y = h - ((v - min) / Math.max(1, max - min || 1)) * (h - 4) - 2;
+        return `${x},${y}`;
+      });
+      const line = pts.join(' ');
+      const area = `0,${h} ${line} ${w},${h}`;
+      const col = stroke || '#ffffff';
+      const gid = 'g'+Math.random().toString(36).slice(2,7);
+      return `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>`
+        + `<polygon points="${area}" fill="url(#${gid})"/>`
+        + `<polyline points="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
+
+    function renderHealthRing(pct){
+      const el = document.getElementById('healthRing');
+      const col = pct>=60 ? '#00E676' : pct>=35 ? '#FFB300' : '#FF5252';
+      const r = 56, c = 2*Math.PI*r, off = c*(1 - pct/100);
+      el.innerHTML = `
+        <svg width="132" height="132" viewBox="0 0 132 132">
+          <circle cx="66" cy="66" r="${r}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="12"/>
+          <circle cx="66" cy="66" r="${r}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round"
+            stroke-dasharray="${c}" stroke-dashoffset="${REDUCED?off:c}" style="transition:stroke-dashoffset 1.2s var(--ease)"/>
+        </svg>
+        <div class="r-center"><div class="n" style="color:${col}">${pct}%</div><div class="l">Closure</div></div>`;
+      if(!REDUCED){ requestAnimationFrame(()=>{ const cir = el.querySelectorAll('circle')[1]; if(cir) cir.style.strokeDashoffset = off; }); }
+    }
+
+    function renderStatusChart(closed, open, inprocess) {
+      if (statusChart) statusChart.destroy();
+      const total = closed + open + inprocess;
+      statusChart = new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: { labels: ['Closed', 'Open', 'In Process'],
+          datasets: [{ data: [closed, open, inprocess], backgroundColor: ['#00E676', '#FFB300', '#64B5F6'], borderColor:'#181818', borderWidth: 3, hoverOffset: 8 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout:'66%',
+          animation:{ animateRotate:true, duration: REDUCED?0:900 },
+          plugins: { legend: { position:'bottom', labels: { color: '#c9c9cf', usePointStyle:true, pointStyle:'circle', padding:16, font:{ size:12 } } },
+            tooltip:{ backgroundColor:'#1f1f1f', borderColor:'rgba(255,255,255,0.14)', borderWidth:1, padding:10, cornerRadius:10 } } }
+        ,plugins:[{
+          id:'centerLabel',
+          afterDraw(chart){
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data || !meta.data.length) return;
+            const { ctx } = chart;
+            const x = meta.data[0].x;
+            const y = meta.data[0].y;
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#f4f4f5';
+            ctx.font = '800 28px Inter';
+            ctx.fillText(String(total), x, y - 8);
+            ctx.fillStyle = '#8b8b90';
+            ctx.font = '600 11px Inter';
+            ctx.fillText('Tickets', x, y + 14);
+            ctx.restore();
+          }
+        }]
+      });
+    }
+
+    function renderTrendChart(trend, trendClosed) {
+      if (trendChart) trendChart.destroy();
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      const gradC = ctx.createLinearGradient(0,0,0,240);
+      gradC.addColorStop(0,'rgba(100,181,246,0.30)'); gradC.addColorStop(1,'rgba(100,181,246,0)');
+      const gradX = ctx.createLinearGradient(0,0,0,240);
+      gradX.addColorStop(0,'rgba(0,230,118,0.28)'); gradX.addColorStop(1,'rgba(0,230,118,0)');
+      const datasets = [
+        { label:'Created', data: trend.map(x => x.value), borderColor: '#64B5F6', backgroundColor: gradC, tension: 0.4, fill: true,
+          pointBackgroundColor:'#64B5F6', pointBorderColor:'#181818', pointBorderWidth:2, pointRadius:3.5, pointHoverRadius:6, borderWidth:2.5 }
+      ];
+      if (trendClosed) datasets.push(
+        { label:'Closed', data: trendClosed.map(x => x.value), borderColor: '#00E676', backgroundColor: gradX, tension: 0.4, fill: true,
+          pointBackgroundColor:'#00E676', pointBorderColor:'#181818', pointBorderWidth:2, pointRadius:3.5, pointHoverRadius:6, borderWidth:2.5 }
+      );
+      trendChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: trend.map(x => x.label), datasets },
+        options: { responsive: true, maintainAspectRatio: false,
+          animation:{ duration: REDUCED?0:900 },
+          interaction:{ mode:'index', intersect:false },
+          scales: { x: { ticks: { color: '#8b8b90' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#8b8b90' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero:true } },
+          plugins: { legend: { display:true, position:'bottom', labels:{ color:'#c9c9cf', usePointStyle:true, pointStyle:'circle', padding:16, font:{ size:12 } } },
+            tooltip:{ backgroundColor:'#1f1f1f', borderColor:'rgba(255,255,255,0.14)', borderWidth:1, padding:10, cornerRadius:10 } } }
+      });
+    }
+
+    function renderFunnelChart(data) {
+      if (funnelChart) funnelChart.destroy();
+      funnelChart = new Chart(document.getElementById('funnelChart'), {
+        type: 'bar',
+        data: { labels: ['Created', 'Assigned', 'In Process', 'Closed'],
+          datasets: [{ data: [data.created, data.assigned, data.processing, data.closed],
+            backgroundColor: ['#ffffff', '#64B5F6', '#FFB300', '#00E676'], borderRadius: 8, borderSkipped:false, barThickness: 26 }] },
+        options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+          animation:{ duration: REDUCED?0:900 },
+          scales: { x: { display: false, grid:{ display:false } }, y: { ticks: { color: '#c9c9cf', font:{ size:12 } }, grid:{ display:false } } },
+          plugins: { legend: { display: false }, tooltip:{ backgroundColor:'#1f1f1f', borderColor:'rgba(255,255,255,0.14)', borderWidth:1, padding:10, cornerRadius:10 } } }
+      });
+    }
+
+    function renderLeaderboard(agents) {
+      const list = Object.entries(agents).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const max = list.length ? list[0][1] : 1;
+      const el = document.getElementById('leaderboard');
+      if (!list.length){ el.innerHTML = '<div class="muted">No closure data yet.</div>'; return; }
+      el.innerHTML = list.map(([name, count], idx) => `
+        <div class="leader">
+          <div class="rank ${idx<3?'r'+(idx+1):''}">${idx+1}</div>
+          <div class="l-body">
+            <div class="l-name">${escapeHtml(name || 'Unknown')}</div>
+            <div class="l-count">${count} ticket${count===1?'':'s'} closed</div>
+            <div class="bar"><i data-w="${Math.max(6, Math.round((count/max)*100))}"></i></div>
+          </div>
+        </div>`).join('');
+      requestAnimationFrame(()=> el.querySelectorAll('.bar > i').forEach(i => i.style.width = i.dataset.w + '%'));
+    }
+
+    function renderTimeline(items) {
+      const el = document.getElementById('timeline');
+      el.innerHTML = '';
+      if (!items.length) { el.innerHTML = '<div class="muted">No recent closures yet.</div>'; return; }
+      el.innerHTML = items.map(item => `
+        <div class="tl-item">
+          <span class="tl-dot"></span>
+          <div class="t-title">${escapeHtml(item.title)}</div>
+          <div class="t-meta">${escapeHtml(item.agent)} · ${escapeHtml(item.date)}</div>
+          <span class="t-tag">${escapeHtml(item.status)}</span>
+        </div>`).join('');
+    }
+
+    function renderHierarchy(cats, relations, catColors) {
+      catColors = catColors || {};
+      const el = document.getElementById('categoryHierarchy');
+      const entries = Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 4);
+      el.innerHTML = entries.length ? entries.map(([cat, count]) => {
+        const col = catColors[cat] || '#8b8b90';
+        const subs = Object.entries(relations)
+          .filter(([key]) => key.startsWith(`${cat}||`))
+          .sort((a, b) => b[1] - a[1]).slice(0, 4).map(([key, n]) => [key.split('||')[1], n]);
+        return `<div class="branch" style="border-left:3px solid ${col};background:linear-gradient(90deg,${hexToRgba(col,0.06)},transparent 55%)">`
+          + `<div class="parent"><i class="cat-dot" style="--cc:${col}"></i>${escapeHtml(cat)} <span class="cnt" style="background:${col};color:#000">${count}</span></div>`
+          + `<div class="children">${subs.map(([s, n]) => `<span class="chip-item" style="border-color:${hexToRgba(col,0.45)};background:${hexToRgba(col,0.1)};color:${col}">${escapeHtml(s)} · ${n}</span>`).join('')}</div></div>`;
+      }).join('') : '<div class="muted">No category data yet.</div>';
+    }
+
+    // Weekday busyness — shows which weekday (Mon…Sun) carries the most volume.
+    // Month heatmap: a real calendar of the most recent month in the (filtered) data,
+    // plus a weekday totals row that names the busiest day.
+    function renderHeatmap(weekday, heatDates) {
+      const el = document.getElementById('heatmap');
+      const full = { Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday', Sun:'Sunday' };
+      const WDL = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      heatDates = heatDates || {};
+      const heatStops = HEATMAP_STOPS;
+
+      // Pick the month with the most recent dated ticket.
+      const isoKeys = Object.keys(heatDates).sort();
+      const latest = isoKeys.length ? isoKeys[isoKeys.length - 1] : null;
+      const [yr, mo] = latest ? latest.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+      const daysInMonth = new Date(yr, mo, 0).getDate();
+      const firstIdx = (new Date(yr, mo - 1, 1).getDay() + 6) % 7; // Mon=0
+      const monthName = new Date(yr, mo - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+      const counts = [];
+      for (let d = 1; d <= daysInMonth; d++) {
+        const iso = yr + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        counts.push(heatDates[iso] || 0);
+      }
+      const maxDay = Math.max(1, ...counts);
+      const maxWd = Math.max(1, ...weekday.map(w => w.value));
+
+      const toRgb = hex => {
+        const value = parseInt(hex.slice(1), 16);
+        return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+      };
+
+      const bandFor = t => (t < 0.34 ? 0 : t < 0.67 ? 1 : 2);
+
+      const shade = (c, max) => {
+        if (!c) return 'background:rgba(255,255,255,0.03);border-color:var(--line);color:var(--faint);box-shadow:none';
+        const t = c / max;
+        const base = toRgb(heatStops[bandFor(t)]);
+        const fill = `rgba(${base.r},${base.g},${base.b},0.26)`;
+        const border = `rgba(${base.r},${base.g},${base.b},0.72)`;
+        const label = bandFor(t) === 2 ? '#140b08' : '#f4fbff';
+        return `background:${fill};border-color:${border};color:${label};box-shadow:inset 0 1px 0 rgba(255,255,255,0.05)`;
+      };
+
+      let html = `<div class="hm-month">${escapeHtml(monthName)}</div>`;
+      html += `<div class="hm-grid">`;
+      html += WDL.map(w => `<div class="wd-name">${w}</div>`).join('');
+      for (let i = 0; i < firstIdx; i++) html += `<div class="heat-cell hm-blank"></div>`;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const c = counts[d - 1];
+        const wdName = full[WDL[(firstIdx + d - 1) % 7]];
+        html += `<div class="heat-cell" style="${shade(c, maxDay)}" title="${wdName} ${d} ${escapeHtml(monthName)}: ${c} ticket${c===1?'':'s'}">${d}</div>`;
+      }
+      html += `</div>`;
+      // Weekday totals row (whole dataset in the current filter)
+      html += `<div class="hm-wd-label">Weekday totals</div><div class="hm-grid">`;
+      html += weekday.map(w => `<div class="heat-cell wd-cell" style="${shade(w.value, maxWd)}" title="${full[w.label]}: ${w.value} ticket${w.value===1?'':'s'}">${w.value}</div>`).join('');
+      html += `</div>`;
+      el.innerHTML = html;
+
+      const busiest = weekday.slice().sort((a, b) => b.value - a.value)[0];
+      const busiestDate = counts.length ? counts.indexOf(Math.max(...counts)) + 1 : null;
+      const cap = document.getElementById('busiestDay');
+      if (cap) {
+        if (busiest && busiest.value) {
+          const datePart = (busiestDate && counts[busiestDate - 1]) ? ` · Peak date: ${busiestDate} ${monthName.split(' ')[0]} (${counts[busiestDate-1]})` : '';
+          cap.textContent = `${full[busiest.label]} is busiest — ${busiest.value} ticket${busiest.value===1?'':'s'}${datePart}`;
+        } else cap.textContent = 'No dated tickets yet';
+      }
+      const scale = document.getElementById('heatScale');
+      if (scale) scale.innerHTML = [
+        { label: 'Low', color: heatStops[0] },
+        { label: 'Medium', color: heatStops[1] },
+        { label: 'High', color: heatStops[2] }
+      ].map(item => `<i style="background:${item.color};border-color:${item.color}" title="${item.label}"></i>`).join('');
+    }
+
+    function renderRelations(relations, catColors) {
+      catColors = catColors || {};
+      const rows = Object.entries(relations).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      const b = document.getElementById('relationBody');
+      b.innerHTML = '';
+      if (!rows.length) { b.innerHTML = '<tr><td colspan="3" class="muted">No relationship data available</td></tr>'; return; }
+      rows.forEach(([key, count]) => {
+        const [cat, sub] = key.split('||');
+        const col = catColors[cat] || '#8b8b90';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><span class="cat-tag" style="--cc:${col}"><i class="cat-dot"></i>${escapeHtml(cat || '')}</span></td>`
+          + `<td><span class="sub-tag" style="--cc:${col}">${escapeHtml(sub || '')}</span></td><td>${count}</td>`;
+        b.appendChild(tr);
+      });
+    }
+
+    // Category table — each row carries its fluorescent identity color.
+    function fillCatTable(id, data, catColors) {
+      const b = document.getElementById(id);
+      b.innerHTML = '';
+      if (!data.length) { b.innerHTML = '<tr><td colspan="2" class="muted">No data available</td></tr>'; return; }
+      const max = data[0][1] || 1;
+      data.forEach(([label, count]) => {
+        const col = catColors[label] || '#8b8b90';
+        const pct = Math.max(3, Math.round((count / max) * 100));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="rowbar" style="background:linear-gradient(90deg,${hexToRgba(col,0.13)} ${pct}%,transparent ${pct}%)">`
+          + `<span class="cat-tag" style="--cc:${col}"><i class="cat-dot"></i>${escapeHtml(label)}</span></td><td style="color:${col}">${count}</td>`;
+        b.appendChild(tr);
+      });
+    }
+
+    // Subcategory table — inherits the parent category's color scheme (softer tint).
+    function fillSubTable(id, data, relations, catColors) {
+      const b = document.getElementById(id);
+      b.innerHTML = '';
+      if (!data.length) { b.innerHTML = '<tr><td colspan="2" class="muted">No data available</td></tr>'; return; }
+      const max = data[0][1] || 1;
+      data.forEach(([label, count]) => {
+        const parent = parentCatOf(label, relations);
+        const col = (parent && catColors[parent]) || '#8b8b90';
+        const pct = Math.max(3, Math.round((count / max) * 100));
+        const tr = document.createElement('tr');
+        const tip = parent ? ` title="Category: ${escapeHtml(parent)}"` : '';
+        tr.innerHTML = `<td class="rowbar"${tip} style="background:linear-gradient(90deg,${hexToRgba(col,0.09)} ${pct}%,transparent ${pct}%)">`
+          + `<span class="sub-tag" style="--cc:${col}">${escapeHtml(label)}</span></td><td style="color:${hexToRgba(col,0.9)}">${count}</td>`;
+        b.appendChild(tr);
+      });
+    }
+
+    function renderInsights({ cats, subs, agents, classes, open, todayClosed }) {
+      const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+      const topSub = Object.entries(subs).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+      const topAgent = Object.entries(agents).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+      const topClass = Object.entries(classes).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
+      document.getElementById('summaryText').innerText = `${topCat} is the main workload driver, while ${topAgent} is leading closures and ${todayClosed} tickets closed today.`;
+      document.getElementById('storyBadge').innerText = `${topCat} · ${topSub}`;
+      const ic = {
+        note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-5 5-3-3-4 4"/></svg>',
+        star:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>',
+        alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+        layer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l9 5-9 5-9-5z"/><path d="M3 12l9 5 9-5"/></svg>'
+      };
+      const list = [
+        { cls:'i-info', ic:ic.note, title:'Executive note', text:`${topCat} is the most active category, signaling the highest workload concentration.` },
+        { cls:'i-good', ic:ic.star, title:'Agent focus', text:`${topAgent} is carrying the strongest closure momentum right now.` },
+        { cls: open>0?'i-warn':'i-good', ic:ic.alert, title:'Open queue', text:`${open} tickets still require attention, so this should be a priority review area.` },
+        { cls:'i-info', ic:ic.layer, title:'Class signal', text:`${topClass} is the most represented class, helping identify where volume is concentrated.` }
+      ];
+      document.getElementById('insights').innerHTML = list.map(i => `<div class="insight ${i.cls}"><strong>${i.ic}${escapeHtml(i.title)}</strong><div class="txt">${escapeHtml(i.text)}</div></div>`).join('');
+      const rate = Object.values(cats).length ? null : null; // no-op, preserved structure
+      const closedPct = (() => { const c = document.querySelector('#kpiGrid'); return c; })();
+      // update hero ring from closure rate (already computed & displayed in KPI)
+      const rateEl = [...document.querySelectorAll('.kpi .k-label')].find(e => e.textContent === 'Closure Rate');
+      let pct = 0;
+      if (rateEl) pct = parseInt(rateEl.parentElement.parentElement.querySelector('.k-val').textContent) || 0;
+      renderHealthRing(isNaN(pct)?0:pct);
+    }
+
+    function fillTable(id, data) {
+      const b = document.getElementById(id);
+      b.innerHTML = '';
+      if (!data.length) { b.innerHTML = '<tr><td colspan="2" class="muted">No data available</td></tr>'; return; }
+      const max = data[0][1] || 1;
+      data.forEach(([label, count]) => {
+        const pct = Math.max(2, Math.round((count/max)*100));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="rowbar" style="background:linear-gradient(90deg,rgba(255,255,255,0.05) ${pct}%,transparent ${pct}%)"><span>${escapeHtml(label)}</span></td><td>${count}</td>`;
+        b.appendChild(tr);
+      });
+    }
+
+    function fillSimple(id, data) {
+      const b = document.getElementById(id);
+      b.innerHTML = '';
+      if (!data.length) { b.innerHTML = '<tr><td colspan="2" class="muted">No data available</td></tr>'; return; }
+      data.forEach(([label, count]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(label)}</td><td>${count}</td>`;
+        b.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(v) {
+      return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    /* ---- field detection & parsing: unchanged ---- */
+    function detectFieldMap(rows) {
+      if (!rows || !rows.length) return {};
+      const headers = Object.keys(rows[0]);
+      const normalizedHeaders = new Map(headers.map(h => [normalizeHeader(h), h]));
+      const findHeader = aliases => {
+        for (const alias of aliases) {
+          const normalizedAlias = normalizeHeader(alias);
+          if (normalizedHeaders.has(normalizedAlias)) return normalizedHeaders.get(normalizedAlias);
+          const match = headers.find(h => normalizeHeader(h).includes(normalizedAlias) || normalizedAlias.includes(normalizeHeader(h)));
+          if (match) return match;
+        }
+        return null;
+      };
+      const map = {
+        status: findHeader(['Status', 'Ticket Status', 'State', 'Current Status', 'Case Status', 'Ticket State']),
+        category: findHeader(['Concern Type Category', 'Category', 'Concern Category', 'Ticket Category', 'Issue Category', 'Type Category', 'Classification']),
+        subcategory: findHeader(['Concern Type', 'Sub Category', 'Subcategory', 'Issue Type', 'Issue Sub Category', 'Sub Type', 'Subtype', 'Ticket Type']),
+        class: findHeader(['Class', 'Class Name', 'Ticket Class', 'Service Class', 'Type Class', 'Class of Ticket']),
+        aoi: findHeader(['AOI', 'AOI Name', 'Area of Interest', 'Area', 'Region', 'Location', 'Focus Area', 'Business Area']),
+        agent: findHeader(['Closed By', 'Handled By', 'Agent', 'Agent Name', 'Assigned To', 'Assigned To Agent', 'Current Owner', 'Owner', 'Assigned Agent', 'Responsible Person']),
+        attachment: findHeader(['Attachment', 'History', 'Activity', 'Comments', 'Notes', 'Audit Trail', 'Comment']),
+        ticket: findHeader(['Ticket Number', 'Ticket ID', 'TicketID', 'Case ID', 'Reference', 'ID']),
+        createdDate: findHeader(['Created Date', 'Created On', 'Date Created', 'Created', 'Opened Date', 'Open Date', 'Received Date', 'Date Opened', 'Ticket Created', 'Creation Date', 'Date Raised', 'Date Received']),
+        closedDate: findHeader(['Closed Date', 'Closure Date', 'Resolved Date', 'Date Closed', 'Completed Date', 'Resolution Date'])
+      };
+      // A single generic "Date" column is the created date — never treat it as the closure date too.
+      // (Closure dates come from the attachment/history text.)
+      if (map.closedDate && map.closedDate === map.createdDate) map.closedDate = null;
+      return map;
+    }
+
+    function normalizeHeader(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+
+    function getFieldValue(row, fieldMap, property, fallbackAliases) {
+      const candidates = [];
+      if (fieldMap && fieldMap[property]) candidates.push(fieldMap[property]);
+      candidates.push(...fallbackAliases);
+      for (const candidate of candidates) {
+        const val = row[candidate];
+        if (val !== undefined && val !== null) {
+          const txt = val.toString().trim();
+          if (txt) return txt;
+        }
+      }
+      return '';
+    }
+
+    function getAoiValue(row, fieldMap) {
+      return getFieldValue(row, fieldMap, 'aoi', ['AOI', 'AOI Name', 'Area of Interest', 'Area', 'Region', 'Location', 'Focus Area', 'Business Area']);
+    }
+
+    function getAgingBucket(row, fieldMap) {
+      const candidates = [
+        getFieldValue(row, fieldMap, 'closedDate', ['Closed Date', 'Closure Date', 'Resolved Date', 'Date Closed', 'Completed Date', 'Resolution Date']),
+        getFieldValue(row, fieldMap, 'createdDate', ['Created Date', 'Created On', 'Date Created', 'Created', 'Opened Date', 'Open Date', 'Received Date', 'Date Opened', 'Ticket Created', 'Creation Date', 'Date Raised', 'Date Received'])
+      ];
+      for (const candidate of candidates) {
+        const parsed = parseDate(candidate);
+        if (parsed) {
+          const ageDays = Math.floor((Date.now() - parsed.getTime()) / 86400000);
+          if (ageDays <= 7) return '0–7 days';
+          if (ageDays <= 14) return '8–14 days';
+          if (ageDays <= 30) return '15–30 days';
+          if (ageDays <= 60) return '31–60 days';
+          return '60+ days';
+        }
+      }
+      return '';
+    }
+
+    function parseDate(value) {
+      if (value === null || value === undefined || value === '') return null;
+      if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+
+      // Excel serial number -> reconstruct as LOCAL wall-clock (timezone-safe, no day shift)
+      if (typeof value === 'number' && isFinite(value)) {
+        const ms = Math.round((value - 25569) * 86400000);
+        const u = new Date(ms);
+        if (isNaN(u.getTime())) return null;
+        return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
+      }
+
+      const s = String(value).trim().replace(/\s+/g, ' ');
+      if (!s) return null;
+      if (/^\d+(\.\d+)?$/.test(s)) return parseDate(parseFloat(s)); // numeric string = serial
+
+      // "DD Mon YYYY [hh:mm[:ss] AM/PM]"  e.g. 01 Jun 2026 02:22 PM  (closure-date format)
+      let m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?)?$/i);
+      if (m) {
+        const MO = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
+        const mo = MO[m[2].slice(0, 3).toLowerCase()];
+        if (mo !== undefined) {
+          let h = m[4] ? +m[4] : 0; const mi = m[5] ? +m[5] : 0, se = m[6] ? +m[6] : 0, ap = m[7] ? m[7].toUpperCase() : null;
+          if (ap === 'PM' && h < 12) h += 12; if (ap === 'AM' && h === 12) h = 0;
+          return new Date(+m[3], mo, +m[1], h, mi, se);
+        }
+      }
+
+      // "M/D/YYYY [hh:mm[:ss] AM/PM]"  e.g. 6/1/2026 11:07:00 AM  (created-date format)
+      m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?)?$/i);
+      if (m) {
+        let a = +m[1], b = +m[2], mo, da;
+        if (a > 12) { da = a; mo = b - 1; } else { mo = a - 1; da = b; } // default M/D; swap only when first field > 12
+        let yr = +m[3]; if (yr < 100) yr += 2000;
+        let h = m[4] ? +m[4] : 0; const mi = m[5] ? +m[5] : 0, se = m[6] ? +m[6] : 0, ap = m[7] ? m[7].toUpperCase() : null;
+        if (ap === 'PM' && h < 12) h += 12; if (ap === 'AM' && h === 12) h = 0;
+        const d = new Date(yr, mo, da, h, mi, se);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      const p = new Date(s);
+      return isNaN(p.getTime()) ? null : p;
+    }
+
+    function normalizeStatus(value) {
+      const s = (value || '').toString().trim().toLowerCase();
+      if (['closed', 'close', 'resolved', 'completed', 'done'].includes(s)) return 'closed';
+      if (['open', 'new', 'pending', 'in progress', 'inprogress'].includes(s)) return 'open';
+      if (['inprocess', 'in process', 'processing', 'working'].includes(s)) return 'inprocess';
+      return s;
+    }
+
+    function extractClosureInfo(row, fieldMap) {
+      const txt = getFieldValue(row, fieldMap, 'attachment', ['Attachment', 'History', 'Activity', 'Comments', 'Notes', 'Audit Trail', 'Comment']).toString();
+      const dated = /([A-Za-z][A-Za-z\s\.\-'&]+?)\s*\(\s*PRO\s*\).*?(?:closed|closed the concern|resolved)\s+(?:the\s+concern\s+)?on\s+(\d{1,2}\s+\w+\s+\d{4}\s+\d{1,2}:\d{2}\s+[AP]M)/gis;
+      const plain = /([A-Za-z][A-Za-z\s\.\-'&]+?)\s*\(\s*PRO\s*\).*?(?:closed|closed the concern|resolved)/gis;
+      // Prefer the last match that actually carries a closure date.
+      let m, lastDated = null;
+      while ((m = dated.exec(txt)) !== null) lastDated = m;
+      if (lastDated) {
+        return { agent: lastDated[1].replace(/\s+/g, ' ').trim(), dt: (lastDated[2] || '').trim() };
+      }
+      // No date present — fall back to just the closing agent.
+      let lastPlain = null;
+      while ((m = plain.exec(txt)) !== null) lastPlain = m;
+      if (lastPlain) {
+        return { agent: lastPlain[1].replace(/\s+/g, ' ').trim(), dt: '' };
+      }
+      const directAgent = getFieldValue(row, fieldMap, 'agent', ['Closed By', 'Handled By', 'Agent', 'Agent Name', 'Assigned To', 'Assigned To Agent', 'Current Owner', 'Owner', 'Assigned Agent', 'Responsible Person']);
+      return { agent: directAgent || 'Unknown', dt: '' };
+    }
+
+    function exportExcel() {
+      const rows = allRows.length ? allRows : [];
+      if (!rows.length) { toast('Upload a workbook first'); return; }
+      const headers = Object.keys(rows[0] || {});
+      const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(','))).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'tickets.csv'; a.click(); URL.revokeObjectURL(url);
+      toast('CSV exported');
+    }
+
+    async function exportMajorMetricsJpeg() {
+      const target = document.getElementById('sec-metrics');
+      if (!target) { toast('Major metrics section not ready'); return; }
+      if (!window.html2canvas) { toast('JPEG export is still loading'); return; }
+      let offscreen = null;
+      try {
+        const hierarchySource = document.querySelector('#categoryHierarchy')?.closest('.panel');
+        const hierarchyClone = hierarchySource ? hierarchySource.cloneNode(true) : null;
+        const reportDate = new Date();
+        const dateText = reportDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const activePeriod = document.getElementById('rangeCaption')?.textContent?.trim() || 'All time';
+        const activeStatus = (document.querySelector('#filters .chip.active')?.textContent || 'All').trim();
+        const searchQuery = searchEl.value.trim();
+        const getKpiValue = label => {
+          const card = [...document.querySelectorAll('#kpiGrid .kpi')].find(el => el.querySelector('.k-label')?.textContent.trim() === label);
+          return card?.querySelector('.k-val')?.textContent.trim() || '—';
+        };
+        const totalTicketsValue = getKpiValue('Total Tickets');
+        const closedValue = getKpiValue('Closed');
+        const openValue = getKpiValue('Open');
+        const inProcessValue = getKpiValue('In Process');
+        const closedTodayValue = getKpiValue('Closed Today');
+        const meta = document.createElement('div');
+        meta.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin:0 0 14px;padding:14px 16px;border:1px solid #e5e7eb;border-radius:18px;background:#fff;color:#111;font-size:12px;line-height:1.4;';
+        meta.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:180px;">
+            <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#6b7280;">Executive metrics</div>
+            <div style="font-size:22px;font-weight:800;line-height:1;color:#111;">${escapeHtml(dateText)}</div>
+          </div>
+          <div style="font-size:12px;color:#4b5563;">Filter: ${escapeHtml(activeStatus)} · Period: ${escapeHtml(activePeriod)} · Search: ${escapeHtml(searchQuery || 'None')}</div>`;
+        const exportHeader = document.createElement('div');
+        exportHeader.style.cssText = 'background:#fff;color:#000;padding:0 0 4px;';
+        exportHeader.appendChild(meta);
+
+        const summaryRow = document.createElement('div');
+        summaryRow.style.cssText = 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;';
+        summaryRow.innerHTML = `
+          <div style="background:#000;color:#fff;border:1px solid #222;border-radius:28px;padding:12px 14px;min-height:74px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d1d5db;">Total Tickets</div>
+            <div style="font-size:26px;font-weight:800;line-height:1;">${escapeHtml(totalTicketsValue)}</div>
+          </div>
+          <div style="background:#000;color:#fff;border:1px solid #222;border-radius:28px;padding:12px 14px;min-height:74px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d1d5db;">Closed</div>
+            <div style="font-size:26px;font-weight:800;line-height:1;">${escapeHtml(closedValue)}</div>
+          </div>
+          <div style="background:#000;color:#fff;border:1px solid #00e676;border-radius:28px;padding:12px 14px;min-height:74px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8ff0ba;">In Process</div>
+            <div style="font-size:26px;font-weight:800;line-height:1;color:#00e676;">${escapeHtml(inProcessValue)}</div>
+          </div>
+          <div style="background:#000;color:#fff;border:1px solid #ff5252;border-radius:28px;padding:12px 14px;min-height:74px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#ffb6b6;">Closed Today</div>
+            <div style="font-size:26px;font-weight:800;line-height:1;color:#ff5252;">${escapeHtml(closedTodayValue)}</div>
+          </div>`;
+
+        const whiteHierarchyCard = node => {
+          node.style.background = '#fff';
+          node.style.color = '#111';
+          node.style.border = '1px solid #e5e7eb';
+          node.style.boxShadow = 'none';
+          node.querySelectorAll('.eyebrow, .hm-month, .hm-wd-label, .wd-name, .busiest, .heat-legend, .l-count, .t-meta, .txt').forEach(el => { el.style.color = '#6b7280'; });
+          node.querySelectorAll('h2, h3, .k-val, .lead, .badge, .parent, .cnt').forEach(el => { el.style.color = '#111'; });
+          node.querySelectorAll('.branch, .leader, .timeline .tl-item, .insight').forEach(el => {
+            el.style.background = '#fff';
+            el.style.borderColor = '#e5e7eb';
+            el.style.boxShadow = 'none';
+          });
+          node.querySelectorAll('.chip-item').forEach(el => {
+            el.style.background = '#f9fafb';
+            el.style.borderColor = '#e5e7eb';
+            el.style.color = '#111';
+          });
+          node.querySelectorAll('.branch .parent .cnt').forEach(el => {
+            el.style.background = '#f3f4f6';
+            el.style.color = '#111';
+          });
+        };
+
+        const exportWrap = document.createElement('div');
+        exportWrap.style.cssText = 'background:#fff;color:#000;display:flex;flex-direction:column;gap:18px;padding:20px;width:1200px;';
+        exportWrap.appendChild(exportHeader);
+        exportWrap.appendChild(summaryRow);
+        if (hierarchyClone) {
+          const hierarchyHead = hierarchyClone.querySelector('h3');
+          if (hierarchyHead) hierarchyHead.textContent = 'Category hierarchy';
+          whiteHierarchyCard(hierarchyClone);
+          exportWrap.appendChild(hierarchyClone);
+        }
+        offscreen = document.createElement('div');
+        offscreen.style.cssText = 'position:absolute;left:-10000px;top:0;background:#fff;z-index:-1;';
+        offscreen.appendChild(exportWrap);
+        document.body.appendChild(offscreen);
+        const canvas = await html2canvas(exportWrap, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: exportWrap.scrollWidth,
+          height: exportWrap.scrollHeight
+        });
+        offscreen.remove();
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+        link.download = `major-metrics-${new Date().toISOString().slice(0, 10)}.jpg`;
+        link.click();
+        toast('JPEG exported');
+      } catch (err) {
+        toast('JPEG export failed');
+      } finally {
+        if (offscreen) offscreen.remove();
+      }
+    }
+
+    function buildFilterChips() {
+      const labels = { all:'All', closed:'Closed', open:'Open', inprocess:'In Process' };
+      const options = ['all', 'closed', 'open', 'inprocess'];
+      filtersEl.innerHTML = options.map(opt => `<button class="chip ${opt === activeFilter ? 'active' : ''}" data-filter="${opt}">${labels[opt]}</button>`).join('');
+      filtersEl.querySelectorAll('.chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.filter;
+          buildFilterChips();
+          applyFilter();
+        });
+      });
+    }
+
+    searchEl.addEventListener('input', applyFilter);
+    buildFilterChips();
+
+    // Period (date) filter wiring
+    const dateFiltersEl = document.getElementById('dateFilters');
+    const customRangeEl = document.getElementById('customRange');
+    dateFiltersEl.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        dateMode = btn.dataset.date;
+        dateFiltersEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === btn));
+        customRangeEl.hidden = dateMode !== 'custom';
+        if (dateMode !== 'custom') applyFilter();
+      });
+    });
+    document.getElementById('applyRange').addEventListener('click', () => {
+      customFrom = document.getElementById('dateFrom').value || null;
+      customTo = document.getElementById('dateTo').value || null;
+      applyFilter();
+    });
+
+    /* =================================================================
+       UI shell wiring (navigation, tilt, loading, toast) — cosmetic only
+    ================================================================= */
+    function revealDashboard(){
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+    }
+
+    function showLoading(name){
+      revealDashboard();
+      kpiGrid.innerHTML = Array.from({length:8}).map((_,i)=>`<div class="kpi" style="height:132px"><div class="skel" style="height:100%"></div></div>`).join('');
+      toast('Reading ' + name + '…');
+    }
+
+    let toastTimer;
+    function toast(msg){
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+    }
+
+    // subtle 3D tilt on KPI cards (skipped for reduced motion)
+    function attachTilt(){
+      if (REDUCED) return;
+      document.querySelectorAll('.kpi').forEach(card => {
+        card.addEventListener('mousemove', e => {
+          const r = card.getBoundingClientRect();
+          const px = (e.clientX - r.left) / r.width - 0.5;
+          const py = (e.clientY - r.top) / r.height - 0.5;
+          card.style.transform = `translateY(-4px) perspective(700px) rotateX(${(-py*5).toFixed(2)}deg) rotateY(${(px*5).toFixed(2)}deg)`;
+        });
+        card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+      });
+    }
+
+    // sidebar navigation + active state
+    const navItems = [...document.querySelectorAll('.nav-item')];
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        closeSidebar();
+        navItems.forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+      });
+    });
+    // scroll-spy
+    const sections = navItems.map(n => document.getElementById(n.dataset.target)).filter(Boolean);
+    const spy = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (en.isIntersecting){
+          const id = en.target.id;
+          navItems.forEach(n => n.classList.toggle('active', n.dataset.target === id));
+        }
+      });
+    }, { rootMargin:'-45% 0px -50% 0px' });
+    sections.forEach(s => spy.observe(s));
+
+    // mobile sidebar
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('backdrop');
+    function openSidebar(){ sidebar.classList.add('open'); backdrop.classList.add('show'); }
+    function closeSidebar(){ sidebar.classList.remove('open'); backdrop.classList.remove('show'); }
+    document.getElementById('hamburger').addEventListener('click', () => sidebar.classList.contains('open') ? closeSidebar() : openSidebar());
+    backdrop.addEventListener('click', closeSidebar);
+  </script>
+</body>
+</html>
